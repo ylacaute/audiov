@@ -1,11 +1,159 @@
-<div class="canvas-wrapper">
-    <div class="dragndrop-wrapper">
-        <input class="buttons" id="audio-file" type="file" accept="audio/*" name="Upload"> <br><br>
+<div class="viz-options">
+    <div class="parameter-container">
+        <div class="parameter-box music-box">
+            <strong>MUSIC</strong>
+            <button type="button"
+                    mat-raised-button
+                    color="primary"
+                    (click)="fileInput.click()">
+                Choose audio file
+            </button>
+            <input hidden (change)="onFileSelected($event)"
+                   #fileInput type="file" id="file">
+            <audio controls></audio>
+            <div class="dragndrop-wrapper">
+                <label>OR DRAG HERE</label>
+            </div>
+        </div>
+        <div class="parameter-box">
+            <strong>TYPE</strong>
+            <mat-form-field class="viz-ctrl">
+                <mat-label>Viz type</mat-label>
+                <mat-select [(ngModel)]="vizTypeSelected">
+                    <mat-option
+                            *ngFor="let type of vizTypes"
+                            [value]="type.value">
+                        {{type.viewValue}}
+                    </mat-option>
+                </mat-select>
+            </mat-form-field>
+
+            <strong>COLOR</strong>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Hue</mat-label>
+                <mat-slider class="ctrl" min="0" max="340" step="1"
+                        [(ngModel)]="currentColorHue"
+                        [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Saturation</mat-label>
+                <mat-slider class="ctrl" min="0" max="100" step="1"
+                            [(ngModel)]="currentColorSaturation"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Lightness</mat-label>
+                <mat-slider class="ctrl" min="0" max="100" step="1"
+                            [(ngModel)]="currentColorLightness"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Alpha</mat-label>
+                <mat-slider class="ctrl" min="0" max="1" step="0.1"
+                            [(ngModel)]="currentColorAlpha"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+        </div>
+
+        <div class="parameter-box">
+            <strong>GENERAL</strong>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Viz size</mat-label>
+                <mat-slider class="ctrl" min="-200" max="200" step="1"
+                            [(ngModel)]="visualizationSize"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <br/>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Min decibel</mat-label>
+                <mat-slider class="ctrl" min="-100" max="-31" step="1"
+                            (change)="handleMinDecibelsChange($event)"
+                            [(ngModel)]="minDecibels"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <br/>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Max decibel</mat-label>
+                <mat-slider class="ctrl" min="-99" max="17" step="1"
+                            (change)="handleMaxDecibelsChange($event)"
+                            [(ngModel)]="maxDecibels"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <br/>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Smoothing time constant</mat-label>
+                <mat-slider class="ctrl" min="0" max="1" step="0.01"
+                            (change)="handleSmoothingTimeConstantChange($event)"
+                            [(ngModel)]="smoothingTimeConstant"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <br/>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Amplificator</mat-label>
+                <mat-slider class="ctrl" min="0" max="3" step="0.01"
+                            [(ngModel)]="amplificator"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <strong>CLEAR</strong>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Clear rate</mat-label>
+                <mat-slider class="ctrl" min="0" max="10" step="1"
+                            [(ngModel)]="clearRate"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+            <br/>
+            <div class="viz-ctrl custom-ctrl">
+                <mat-label>Clear alpha</mat-label>
+                <mat-slider class="ctrl" min="0" max="1" step="0.01"
+                            [(ngModel)]="clearAlpha"
+                            [thumbLabel]="true">
+                </mat-slider>
+            </div>
+        </div>
+
+        <div class="parameter-box">
+            <strong>EFFECT</strong>
+            <br/>
+            <mat-form-field class="viz-ctrl">
+                <mat-label>GlobalCompositeOperation before clean</mat-label>
+                <mat-select [(ngModel)]="GlobalCompositeOperationBeforeClean">
+                    <mat-option
+                            *ngFor="let gco of globalCompositeOperations"
+                            [value]="gco.value">
+                        {{gco.viewValue}}
+                    </mat-option>
+                </mat-select>
+            </mat-form-field>
+            <br/>
+            <mat-form-field class="viz-ctrl">
+                <mat-label>GlobalCompositeOperation after clean</mat-label>
+                <mat-select [(ngModel)]="GlobalCompositeOperationAfterClean">
+                    <mat-option
+                            *ngFor="let gco of globalCompositeOperations"
+                            [value]="gco.value">
+                        {{gco.viewValue}}
+                    </mat-option>
+                </mat-select>
+            </mat-form-field>
+        </div>
     </div>
-    <br/>
-    <audio controls></audio>
+
+
+
+</div>
+<div class="canvas-wrapper">
     <canvas id="main-canvas" width="1200" height="800">
     </canvas>
 </div>
-<button class="buttons" id="start-button" (click)="visualize()">Visualize!</button>
+
 

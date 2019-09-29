@@ -4,25 +4,92 @@ interface Point {
   x: number;
   y: number;
 }
+export interface SelectOption {
+  value: string;
+  viewValue: string;
+}
+
+type VizType = 'CLASSIC' | 'LINES' | 'SPOT' | 'LOGO' | 'PARAM_LINE' | 'CIRCLE' | 'XGONE';
 
 @Component({
   selector: 'app-visualizer',
   templateUrl: './visualizer.component.html',
   styleUrls: ['./visualizer.component.scss']
 })
-export class VisualizerComponent {
+export class VisualizerComponent implements OnInit {
 
-  DARK_GRAY = 'rgb(48, 48, 48)';
-  LIGHT_GRAY = 'rgb(224, 224, 224)';
+  globalCompositeOperations: SelectOption[] = [
+    {value: 'source-over', viewValue: 'source-over'},
+    {value: 'source-in', viewValue: 'source-in'},
+    {value: 'source-out', viewValue: 'source-out'},
+    {value: 'source-atop', viewValue: 'source-atop'},
+    {value: 'destination-over', viewValue: 'destination-over'},
+    {value: 'destination-in', viewValue: 'destination-in'},
+    {value: 'destination-out', viewValue: 'destination-out'},
+    {value: 'destination-atop', viewValue: 'destination-atop'},
+    {value: 'lighter', viewValue: 'lighter'},
+    {value: 'copy', viewValue: 'copy'},
+    {value: 'xor', viewValue: 'xor'},
+    {value: 'multiply', viewValue: 'multiply'},
+    {value: 'screen', viewValue: 'screen'},
+    {value: 'overlay', viewValue: 'overlay'},
+    {value: 'darken', viewValue: 'darken'},
+    {value: 'lighten', viewValue: 'lighten'},
+    {value: 'color-dodge', viewValue: 'color-dodge'},
+    {value: 'color-burn', viewValue: 'color-burn'},
+    {value: 'hard-light', viewValue: 'hard-light'},
+    {value: 'soft-light', viewValue: 'soft-light'},
+    {value: 'difference', viewValue: 'difference'},
+    {value: 'exclusion', viewValue: 'exclusion'},
+    {value: 'hue', viewValue: 'hue'},
+    {value: 'saturation', viewValue: 'saturation'},
+    {value: 'color', viewValue: 'color'},
+    {value: 'luminosity', viewValue: 'luminosity'}
+  ];
 
+  vizTypes: SelectOption[] = [
+    {value: 'CLASSIC', viewValue: 'Classic'},
+    {value: 'LINES', viewValue: 'Lines'},
+    {value: 'SPOT', viewValue: 'Spot light'},
+    {value: 'LOGO', viewValue: 'Logo poly'},
+    {value: 'PARAM_LINE', viewValue: 'Param line'},
+    {value: 'CIRCLE', viewValue: 'Circle'},
+    {value: 'XGONE', viewValue: 'XGone'},
+  ];
+
+  // PARAMETERS
+  vizTypeSelected = 'CLASSIC';
+  GlobalCompositeOperationBeforeClean = 'destination-out';
+  GlobalCompositeOperationAfterClean = 'lighter';
+  currentColorHue = 340;
+  currentColorSaturation = 100;
+  currentColorLightness = 50;
+  currentColorAlpha = 1;
+  clearRate = 1;
+  clearCounter = 0;
+  clearAlpha = 0.1;
+  visualizationSize = 0;
+  minDecibels = -100;
+  maxDecibels = 0;
+  smoothingTimeConstant = 0.85;
+  amplificator = 1.2; // pow
+
+  
+
+  // INTERNAL
+  frameCounter = 0;
   fileReader;
-
   audioContext;
   canvas;
   ctx;
   analyser;
   audioSourceNode;
   bufferSize = 2048; // fftSize;
+  w; // canvas width
+  h; // canvas height
+  cw; // center canvas x
+  ch; // center canvas y
+
   freqBinCount = this.bufferSize;
   barWidth;
   barSpacing = 5;
@@ -35,70 +102,86 @@ export class VisualizerComponent {
   shadowBlur = 10;
   shadowColor = '#ffffff';
   font = ['12px', 'Helvetica'];
-
-    backgroundColor = 'hsla(340, 0%, 0%, 1)';
-  // backgroundColor = 'rgba(0, 0, 0, 0.5)';
-  w;
-  h;
-  cw;
-  ch;
   circle;
-
-
   // LINE
   lineMemoryCount = 15;
   lineMemoryBuffer = new Array(this.lineMemoryCount);
-
   generateLineEvery = 5; // frames
-  frameCounter = 0;
-
   removeBassPercent = 5;
   removeTreblePercent = 15;
+  backgroundImage = new Image();
 
   constructor() {
+  }
 
-    window.onload = () => {
-      this.canvas = document.getElementById('main-canvas');
-      this.ctx = this.canvas.getContext('2d');
-      this.w = this.canvas.width;
-      this.h = this.canvas.height;
-      this.cw = this.w / 2;
-      this.ch = this.h / 2;
-      console.log('ctx: ', this.ctx);
-
-      this.circle = {
-        x: (this.cw / 2) + 5,
-        y: (this.ch / 2) + 22,
-        radius: 90,
-        speed: 2,
-        rotation: 0,
-        angleStart: 270,
-        angleEnd: 90,
-        hue: 220,
-        thickness: 18,
-        blur: 25
-      };
+  ngOnInit(): void {
+    this.canvas = document.getElementById('main-canvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.w = this.canvas.width;
+    this.h = this.canvas.height;
+    this.cw = this.w / 2;
+    this.ch = this.h / 2;
+    this.circle = {
+      x: (this.cw / 2) + 5,
+      y: (this.ch / 2) + 22,
+      radius: 90,
+      speed: 2,
+      rotation: 0,
+      angleStart: 270,
+      angleEnd: 90,
+      hue: 220,
+      thickness: 18,
+      blur: 25
     };
-
+    this.setCanvasStyles();
+    this.ctx.fillText('Audio Visualizer', this.canvas.width / 2 + 10, this.canvas.height / 2);
   }
 
-  drawGradient(x, y, amplitude, color) {
-    const grad1 = this.ctx.createRadialGradient(
-      x,
-      y,
-      0,
-      x,
-      y,
-      amplitude
-    );
-    grad1.addColorStop(0, color);
-    grad1.addColorStop(1, this.backgroundColor);
-    this.ctx.globalCompositeOperation = 'color';
-    this.ctx.fillStyle = grad1;
-    this.ctx.fillRect(0, 0, this.w, this.h);
+  setCanvasStyles() {
+    const { ctx, backgroundImage } = this;
+    this.gradient = this.ctx.createLinearGradient(0, 0, 0, 300);
+    this.gradient.addColorStop(1, this.barColor);
+    ctx.fillStyle = this.gradient;
+    ctx.shadowBlur = this.shadowBlur;
+    ctx.shadowColor = this.shadowColor;
+    ctx.font = this.font.join(' ');
+    ctx.textAlign = 'center';
   }
 
-  rand(min, max ) {
+  handleMinDecibelsChange(event) {
+    this.analyser.minDecibels = event.value;
+  }
+
+  handleMaxDecibelsChange(event) {
+    this.analyser.maxDecibels = event.value;
+  }
+
+  handleSmoothingTimeConstantChange(event) {
+    this.analyser.smoothingTimeConstant = event.value;
+  }
+
+  onFileSelected(event) {
+    if (this.audioSourceNode) {
+      this.audioSourceNode.stop();
+    }
+    this.fileReader = new FileReader();
+    this.audioContext = new AudioContext();
+    this.fileReader.readAsArrayBuffer(event.target.files[0]);
+    this.fileReader.onload = this.onFileLoadedHandler.bind(this);
+  }
+
+  getBackgroundColor() {
+    return 'rgba(0, 0, 0, ' + this.clearAlpha + ')';
+  }
+
+  getCurrentColor(hueModifier = 0) {
+    return 'hsla(' + (this.currentColorHue + hueModifier % 340) + ', '
+      + this.currentColorSaturation + '%, '
+      + this.currentColorLightness + '%, '
+      + this.currentColorAlpha + ')';
+  }
+
+  random(min, max ) {
     return Math.random() * (max - min) + min;
   }
 
@@ -106,27 +189,11 @@ export class VisualizerComponent {
     return degrees * (Math.PI / 180);
   }
 
-  visualize() {
-    if (this.audioSourceNode) {
-      this.audioSourceNode.stop();
-    }
-    this.fileReader = new FileReader();
-    this.audioContext = new AudioContext();
-    const input: HTMLInputElement = document.getElementById('audio-file') as HTMLInputElement;
-    this.setCanvasStyles();
-    this.ctx.fillText('Audio Visualizer', this.canvas.width / 2 + 10, this.canvas.height / 2);
-    console.log('input.files[0] : ', input.files[0]);
-    this.fileReader.readAsArrayBuffer(input.files[0]);
-    this.fileReader.onload = this.onFileLoadedHandler.bind(this);
-  }
-
   onFileLoadedHandler() {
     const audioData = this.fileReader.result;
-    console.log('audioData', audioData);
     this.audioContext
       .decodeAudioData(audioData)
       .then((decodedData) => {
-        console.log(decodedData);
         this.audioSourceNode = new AudioBufferSourceNode(this.audioContext);
         this.audioSourceNode.buffer = decodedData;
         this.audioSourceNode.start();
@@ -137,8 +204,6 @@ export class VisualizerComponent {
   analyseAudio(audioSourceNode) {
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = this.bufferSize;
-    // this.analyser.minDecibels = -90;
-    // this.analyser.maxDecibels = -10;
     this.analyser.smoothingTimeConstant = 0.85;
     audioSourceNode.connect(this.analyser);
     this.analyser.connect(this.audioContext.destination);
@@ -146,21 +211,60 @@ export class VisualizerComponent {
     this.renderLoop();
   }
 
+  clear() {
+    const { ctx, w, h, cw, ch } = this;
+    if (this.clearCounter % this.clearRate === 0) {
+      ctx.save();
+      // const zoomfactor = 1.5;
+      // ctx.setTransform(
+      //   zoomfactor, 0, 0,
+      //   zoomfactor, -(zoomfactor - 1) * cw,
+      //   -(zoomfactor - 1) * ch / 2);
+      ctx.globalCompositeOperation = this.GlobalCompositeOperationBeforeClean;
+      //ctx.translate(cw, ch);
+      ctx.scale(2.1, 2.1);
+
+      ctx.drawImage(ctx, 0, 0);
+
+      // ctx.translate(cw, ch);
+      // ctx.rotate(1);
+
+      ctx.fillStyle = this.getBackgroundColor();
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+
+      ctx.restore();
+      ctx.globalCompositeOperation = this.GlobalCompositeOperationAfterClean;
+
+      // IDENTITY
+      // ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+
+    if (this.clearCounter++ === Number.MAX_SAFE_INTEGER) {
+      this.clearCounter = 1;
+    }
+  }
+
   renderLoop() {
     window.requestAnimationFrame(this.renderLoop.bind(this));
     this.analyser.getByteFrequencyData(this.frequencyData);
+    this.clear();
+    switch (this.vizTypeSelected) {
+      case 'CLASSIC' : this.renderAudioGoneMirror(); break;
+      case 'SPOT': this.renderSpotLight(); break;
+      case 'LOGO': this.renderLogoPoly(); break;
+      case 'PARAM_LINE': this.renderParameterizedLine(); break;
+      case 'CIRCLE': this.renderCircle(); break;
+      case 'LINES': this.renderMultiLines(); break;
+      case 'XGONE': this.renderXgone(); break;
+    }
 
-    this.clearSmooth();
-    // this.renderParameterizedLine();
-
-    // this.renderLogoPoly();
-     this.renderAudioGoneMirror();
-    // this.renderMultiLines();
-    // this.updateCircle();
-    // this.renderCircle();
-    // this.renderLight();
+    if (this.frameCounter++ === Number.MAX_SAFE_INTEGER) {
+      this.frameCounter = 1;
+    }
   }
-// http://paperjs.org/tutorials/geometry/vector-geometry/
+
   renderParameterizedLine() {
     const { ctx, ch, h, frequencyData } = this;
     const hue = 340;
@@ -293,8 +397,7 @@ export class VisualizerComponent {
     return distances;
   }
 
-
-  enderLogoPolyInit() {
+  renderLogoPolyInit() {
     const { ctx, ch, cw, frequencyData } = this;
     const size = 100;
 
@@ -316,8 +419,8 @@ export class VisualizerComponent {
   }
 
   renderAudioGoneMirror() {
-    const { ctx, ch, cw, frequencyData } = this;
-    const size = 50;
+    const { ctx, ch, cw, frequencyData, amplificator } = this;
+    const size = this.visualizationSize;
     const numberOfSides = this.bufferSize / Math.PI;
     const startPt = {
       x: cw,
@@ -327,14 +430,14 @@ export class VisualizerComponent {
 
     ctx.beginPath();
     ctx.moveTo(
-      startPt.x + (size + frequencyData[0]) * -Math.sin(0),
-      startPt.y + (size + frequencyData[0]) * -Math.cos(0));
+      startPt.x + (size + frequencyData[1] * amplificator) * -Math.sin(0),
+      startPt.y + (size + frequencyData[1] * amplificator) * -Math.cos(0));
     for (let i = 1; i < numberOfSides; i++) {
       let pulse;
       if (i < (numberOfSides / 2)) {
-        pulse = frequencyData[i];
+        pulse = frequencyData[i] * amplificator;
       } else {
-        pulse = frequencyData[(Math.floor(numberOfSides - i))];
+        pulse = frequencyData[(Math.floor(numberOfSides - i))] * amplificator;
       }
       ctx.lineTo(
         startPt.x + (size + pulse) * -Math.sin(i * 2 * Math.PI / numberOfSides),
@@ -342,10 +445,10 @@ export class VisualizerComponent {
       );
     }
     ctx.lineTo(
-      startPt.x + (size + frequencyData[0]) * -Math.sin(0),
-      startPt.y + (size + frequencyData[0]) * -Math.cos(0)
+      startPt.x + (size + frequencyData[1] * amplificator) * -Math.sin(0),
+      startPt.y + (size + frequencyData[1] * amplificator) * -Math.cos(0)
     );
-    ctx.strokeStyle = '#F00';
+    ctx.strokeStyle = this.getCurrentColor();
     ctx.lineWidth = 1;
     ctx.stroke();
 
@@ -412,34 +515,6 @@ export class VisualizerComponent {
     ctx.stroke();
   }
 
-
-
-  clearRough() {
-    const { ctx, w, h, cw, ch } = this;
-    ctx.fillStyle = this.backgroundColor;
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  clearSmooth() {
-    const { ctx, w, h, cw, ch } = this;
-    ctx.globalCompositeOperation = 'destination-out';
-    // ctx.fillStyle = 'rgba(0, 0, 0, .1)';
-    ctx.fillStyle = this.backgroundColor;
-    ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'lighter';
-
-    // this.ctx.clearRect(0, 0, this.w, this.h);
-  }
-
-  updateCircle() {
-    const { circle } = this;
-    if (circle.rotation < 360) {
-      circle.rotation += circle.speed;
-    } else {
-      circle.rotation = 0;
-    }
-  }
-
   renderCircle() {
     const { ctx, circle, dToR } = this;
 
@@ -457,6 +532,11 @@ export class VisualizerComponent {
     ctx.strokeStyle = gradient4;
     ctx.stroke();
     ctx.restore();
+    if (circle.rotation < 360) {
+      circle.rotation += circle.speed;
+    } else {
+      circle.rotation = 0;
+    }
   }
 
   renderClassic() {
@@ -471,7 +551,7 @@ export class VisualizerComponent {
     }
   }
 
-  renderLight() {
+  renderSpotLight() {
     this.analyser.getByteFrequencyData(this.frequencyData);
 
     let bassAmplitude = 0;
@@ -481,51 +561,66 @@ export class VisualizerComponent {
     bassAmplitude = Math.round(Math.pow(bassAmplitude / 400, 6));
     const x = Math.round(this.w / 2);
     const y = Math.round(this.h / 2);
-    this.drawGradient(x, y, bassAmplitude, 'hsl(221,63%,49%)');
+    this.drawGradient(x, y, bassAmplitude, this.getCurrentColor());
 
     let medAmplitude = 0;
     for (let i = 40; i < 50; i++) {
       medAmplitude += this.frequencyData[i];
     }
     medAmplitude = Math.round(Math.pow(medAmplitude / 200, 2));
-    this.drawGradient(x - 400, y, medAmplitude, 'hsl(21,80%,52%)');
-    this.drawGradient(x + 400, y, medAmplitude, 'hsl(5,78%,57%)');
+    this.drawGradient(x - 400, y, medAmplitude, this.getCurrentColor(50));
+    this.drawGradient(x + 400, y, medAmplitude, this.getCurrentColor(50));
 
     let trebleAmplitude = 0;
     for (let i = 80; i < 100; i++) {
       trebleAmplitude += this.frequencyData[i];
     }
     trebleAmplitude = Math.round(Math.pow(trebleAmplitude / 200, 2));
-    this.drawGradient(x - 200, y, trebleAmplitude, 'hsl(71,65%,72%)');
-    this.drawGradient(x + 200, y, trebleAmplitude, 'hsl(101,63%,74%)');
-  }
-
-  setCanvasStyles() {
-    this.gradient = this.ctx.createLinearGradient(0, 0, 0, 300);
-    this.gradient.addColorStop(1, this.barColor);
-    this.ctx.fillStyle = this.gradient;
-    this.ctx.shadowBlur = this.shadowBlur;
-    this.ctx.shadowColor = this.shadowColor;
-    this.ctx.font = this.font.join(' ');
-    this.ctx.textAlign = 'center';
+    this.drawGradient(x - 200, y, trebleAmplitude, this.getCurrentColor(150));
+    this.drawGradient(x + 200, y, trebleAmplitude, this.getCurrentColor(150));
   }
 
   renderXgone() {
     const { ctx, ch, cw, frequencyData } = this;
     const numberOfSides = 128;
     const size = 150;
-    const Xcenter = cw;
-    const Ycenter = ch;
+    const centerX = cw;
+    const centerY = ch;
 
     ctx.beginPath();
-    ctx.moveTo (Xcenter + size * Math.cos(0), Ycenter +  size *  Math.sin(0));
+    ctx.moveTo (centerX + size * Math.cos(0), centerY +  size *  Math.sin(0));
     for (let i = 1; i <= numberOfSides; i++) {
       ctx.lineTo(
-        Xcenter + size * Math.cos(i * 2 * Math.PI / numberOfSides),
-        Ycenter + size * Math.sin(i * 2 * Math.PI / numberOfSides));
+        centerX + size * Math.cos(i * 2 * Math.PI / numberOfSides),
+        centerY + size * Math.sin(i * 2 * Math.PI / numberOfSides));
     }
     ctx.strokeStyle = '#F00';
     ctx.lineWidth = 1;
     ctx.stroke();
   }
+
+  drawGradient(x, y, amplitude, color) {
+    const grad1 = this.ctx.createRadialGradient(
+      x,
+      y,
+      0,
+      x,
+      y,
+      amplitude
+    );
+    grad1.addColorStop(0, color);
+    grad1.addColorStop(1, this.getBackgroundColor());
+    this.ctx.globalCompositeOperation = 'color';
+    this.ctx.fillStyle = grad1;
+    this.ctx.fillRect(0, 0, this.w, this.h);
+  }
 }
+
+
+//////////////////////////////////
+// Crée un nouvel élément Image
+//   backgroundImage.onload = () => {
+//     ctx.drawImage(backgroundImage, 0, 0);
+//   };
+//   backgroundImage.src = 'https://wallpaperplay.com/walls/full/f/6/8/131287.jpg'; // Définit le chemin vers sa source
+
