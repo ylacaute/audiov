@@ -59,29 +59,37 @@ export class VisualizerComponent implements OnInit {
 
   // PARAMETERS
   vizTypeSelected = 'CLASSIC';
-  GlobalCompositeOperationBeforeClean = 'destination-out';
-  GlobalCompositeOperationAfterClean = 'lighter';
   currentColorHue = 340;
   currentColorSaturation = 100;
   currentColorLightness = 50;
   currentColorAlpha = 1;
   clearRate = 1;
   clearCounter = 0;
-  clearAlpha = 0.1;
+  clearAlpha = 0.6;
   visualizationSize = 0;
   minDecibels = -100;
   maxDecibels = 0;
   smoothingTimeConstant = 0.85;
-  amplificator = 1.2; // pow
+  amplificator = 1.4; // pow
+  mainLayerParameters = {
+    globalCompositeOperationBeforeClean: 'destination-out',
+    globalCompositeOperationAfterClean: 'lighter'
+  };
+  vizLayerParameters = {
+    globalCompositeOperationBeforeClean: 'destination-out',
+    globalCompositeOperationAfterClean: 'lighter'
+  };
 
-  
+
 
   // INTERNAL
   frameCounter = 0;
   fileReader;
   audioContext;
   canvas;
-  ctx;
+  vizLayer;
+  vizCtx;
+  mainCtx;
   analyser;
   audioSourceNode;
   bufferSize = 2048; // fftSize;
@@ -116,7 +124,7 @@ export class VisualizerComponent implements OnInit {
 
   ngOnInit(): void {
     this.canvas = document.getElementById('main-canvas');
-    this.ctx = this.canvas.getContext('2d');
+    this.mainCtx = this.canvas.getContext('2d');
     this.w = this.canvas.width;
     this.h = this.canvas.height;
     this.cw = this.w / 2;
@@ -133,19 +141,25 @@ export class VisualizerComponent implements OnInit {
       thickness: 18,
       blur: 25
     };
-    this.setCanvasStyles();
-    this.ctx.fillText('Audio Visualizer', this.canvas.width / 2 + 10, this.canvas.height / 2);
+    this.vizLayer = document.createElement('canvas');
+    this.vizLayer.width = this.w;
+    this.vizLayer.height = this.h;
+    this.vizCtx = this.vizLayer.getContext('2d');
+    this.setContextStyles(this.vizCtx);
+    // this.setContextStyles(this.mainCtx);
+    this.mainCtx.drawImage(this.vizLayer, 0, 0, this.w, this.h);
   }
 
-  setCanvasStyles() {
-    const { ctx, backgroundImage } = this;
-    this.gradient = this.ctx.createLinearGradient(0, 0, 0, 300);
-    this.gradient.addColorStop(1, this.barColor);
-    ctx.fillStyle = this.gradient;
+  setContextStyles(ctx) {
+    const { w, h } = this;
+    // this.gradient = mainCtx.createLinearGradient(0, 0, 0, 300);
+    // this.gradient.addColorStop(1, this.barColor);
+    // mainCtx.fillStyle = this.gradient;
     ctx.shadowBlur = this.shadowBlur;
     ctx.shadowColor = this.shadowColor;
     ctx.font = this.font.join(' ');
     ctx.textAlign = 'center';
+    ctx.fillText('Audio Visualizer', w / 2 + 10, h / 2);
   }
 
   handleMinDecibelsChange(event) {
@@ -207,51 +221,16 @@ export class VisualizerComponent implements OnInit {
     this.analyser.smoothingTimeConstant = 0.85;
     audioSourceNode.connect(this.analyser);
     this.analyser.connect(this.audioContext.destination);
-    console.log(this.analyser);
     this.renderLoop();
-  }
-
-  clear() {
-    const { ctx, w, h, cw, ch } = this;
-    if (this.clearCounter % this.clearRate === 0) {
-      ctx.save();
-      // const zoomfactor = 1.5;
-      // ctx.setTransform(
-      //   zoomfactor, 0, 0,
-      //   zoomfactor, -(zoomfactor - 1) * cw,
-      //   -(zoomfactor - 1) * ch / 2);
-      ctx.globalCompositeOperation = this.GlobalCompositeOperationBeforeClean;
-      //ctx.translate(cw, ch);
-      ctx.scale(2.1, 2.1);
-
-      ctx.drawImage(ctx, 0, 0);
-
-      // ctx.translate(cw, ch);
-      // ctx.rotate(1);
-
-      ctx.fillStyle = this.getBackgroundColor();
-      ctx.fillRect(0, 0, w, h);
-      ctx.globalCompositeOperation = 'source-over';
-
-      ctx.restore();
-      ctx.globalCompositeOperation = this.GlobalCompositeOperationAfterClean;
-
-      // IDENTITY
-      // ctx.setTransform(1, 0, 0, 1, 0, 0);
-    }
-
-
-    if (this.clearCounter++ === Number.MAX_SAFE_INTEGER) {
-      this.clearCounter = 1;
-    }
   }
 
   renderLoop() {
     window.requestAnimationFrame(this.renderLoop.bind(this));
     this.analyser.getByteFrequencyData(this.frequencyData);
     this.clear();
+
     switch (this.vizTypeSelected) {
-      case 'CLASSIC' : this.renderAudioGoneMirror(); break;
+      case 'CLASSIC' : this.renderAudioGoneMirror(this.vizCtx); break;
       case 'SPOT': this.renderSpotLight(); break;
       case 'LOGO': this.renderLogoPoly(); break;
       case 'PARAM_LINE': this.renderParameterizedLine(); break;
@@ -260,28 +239,55 @@ export class VisualizerComponent implements OnInit {
       case 'XGONE': this.renderXgone(); break;
     }
 
+    this.mainCtx.drawImage(this.vizLayer, 0, 0);
+
     if (this.frameCounter++ === Number.MAX_SAFE_INTEGER) {
       this.frameCounter = 1;
     }
   }
 
-  renderParameterizedLine() {
-    const { ctx, ch, h, frequencyData } = this;
-    const hue = 340;
-    const opacity = 1;
-    const offsetY = ch;
-    ctx.strokeStyle = 'hsla(' + hue + ', 100%, 50%, ' + opacity + ')';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, offsetY);
-    for (let i = 1; i < frequencyData.length; i++) {
-      ctx.lineTo(i * 2, offsetY - frequencyData[i]);
+  clear() {
+    const { mainCtx, vizCtx, w, h, cw, ch } = this;
+
+    mainCtx.globalCompositeOperation = this.mainLayerParameters.globalCompositeOperationBeforeClean;
+    mainCtx.fillStyle = this.getBackgroundColor();
+    mainCtx.fillRect(0, 0, w, h);
+    mainCtx.globalCompositeOperation = this.mainLayerParameters.globalCompositeOperationAfterClean;
+
+    vizCtx.globalCompositeOperation = this.vizLayerParameters.globalCompositeOperationBeforeClean;
+    if (this.clearCounter % this.clearRate === 0) {
+      vizCtx.fillStyle = this.getBackgroundColor();
+      vizCtx.fillRect(0, 0, w, h);
     }
-    ctx.stroke();
+    vizCtx.globalCompositeOperation = this.vizLayerParameters.globalCompositeOperationAfterClean;
+
+    // const zoomfactor = 1.1;
+    // mainCtx.setTransform(
+    //   zoomfactor, 0, 0,
+    //   zoomfactor, -(zoomfactor - 1) * cw,
+    //   -(zoomfactor - 1) * ch / 2);
+    // mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+    // mainCtx.scale(1.001, 1.001);
+    if (this.clearCounter++ === Number.MAX_SAFE_INTEGER) {
+      this.clearCounter = 1;
+    }
+  }
+
+  renderParameterizedLine() {
+    const { mainCtx, ch, h, frequencyData } = this;
+    const offsetY = ch;
+    mainCtx.strokeStyle = this.getCurrentColor();
+    mainCtx.lineWidth = 1;
+    mainCtx.beginPath();
+    mainCtx.moveTo(0, offsetY);
+    for (let i = 1; i < frequencyData.length; i++) {
+      mainCtx.lineTo(i * 2, offsetY - frequencyData[i]);
+    }
+    mainCtx.stroke();
   }
 
   renderLogoPoly() {
-    const { ctx, ch, cw, frequencyData } = this;
+    const { mainCtx, ch, cw, frequencyData } = this;
     const size = 150;
     const startPt = {
       x: cw - size / 2,
@@ -299,12 +305,8 @@ export class VisualizerComponent implements OnInit {
     const distances = this.calculateDistances(pts);
     const distPercent = this.calculateDistPercent(distances);
     const freqBySides = this.computeFreqBySide(distPercent, this.bufferSize);
-
     this.analyser.getByteFrequencyData(frequencyData);
-
-
     this.drawSide(pts, freqBySides[0]);
-
     // if (incX < 1) {
     //   incX = 1;
     // }
@@ -314,37 +316,19 @@ export class VisualizerComponent implements OnInit {
     // const incX = 1;
     // const incY = 1;
 
-
-    // if (this.frameCounter === 0) {
-    //   console.log('distances: ', distances);
-    //   console.log('distPercent: ', distPercent);
-    //   console.log('freqBySide: ', freqBySide);
-    //   console.log('LINE1 incX: ', incX);
-    //   console.log('LINE1 incY: ', incY);
-    //     this.frameCounter++;
-    //   }
-
-
-
-    // this.drawPoints(pts);
-
-    ctx.strokeStyle = '#F00';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    mainCtx.strokeStyle = '#F00';
+    mainCtx.lineWidth = 1;
+    mainCtx.stroke();
   }
 
   private drawSide(pts, freqBySide) {
-    const { ctx, frequencyData } = this;
+    const { mainCtx, frequencyData } = this;
     const incX = Math.abs(pts[0] - pts[2]) / freqBySide;
     const incY = Math.abs(pts[1] - pts[3]) / freqBySide;
 
-    const pulseX = 10;
-    const pulseY = 10;
-
-
-    ctx.moveTo(pts[0], pts[1]);
+    mainCtx.moveTo(pts[0], pts[1]);
     for (let i = 1; i < freqBySide; i++) {
-      ctx.lineTo(pts[0] + incX * i, pts[1] - incY * i );
+      mainCtx.lineTo(pts[0] + incX * i, pts[1] - incY * i );
       console.log(
         'moveTo : ' + pts[0] + ', ' + pts[1] + '\n' +
         'lineTo : ' + (pts[0] + incX * i) + ', ' + (pts[1] - incY * i));
@@ -360,10 +344,10 @@ export class VisualizerComponent implements OnInit {
   }
 
   drawPoints(pts) {
-    const { ctx } = this;
-    ctx.moveTo(pts[0], pts[1]);
+    const { mainCtx } = this;
+    mainCtx.moveTo(pts[0], pts[1]);
     for (let i = 2; i < pts.length; i += 2) {
-      ctx.lineTo(pts[i], pts[i + 1]);
+      mainCtx.lineTo(pts[i], pts[i + 1]);
     }
   }
 
@@ -398,7 +382,7 @@ export class VisualizerComponent implements OnInit {
   }
 
   renderLogoPolyInit() {
-    const { ctx, ch, cw, frequencyData } = this;
+    const { mainCtx, ch, cw, frequencyData } = this;
     const size = 100;
 
     const startPt = {
@@ -406,20 +390,20 @@ export class VisualizerComponent implements OnInit {
       y: ch - 100 / 2
     };
 
-    ctx.moveTo(startPt.x, startPt.y);
-    ctx.lineTo(startPt.x + size, startPt.y);
-    ctx.lineTo(startPt.x + size, startPt.y + 100 * 0.9085);
-    ctx.lineTo(startPt.x + size / 2, startPt.y + 100 * 1.1851);
-    ctx.lineTo(startPt.x, startPt.y + 100 * 0.9085);
-    ctx.lineTo(startPt.x, startPt.y);
+    mainCtx.moveTo(startPt.x, startPt.y);
+    mainCtx.lineTo(startPt.x + size, startPt.y);
+    mainCtx.lineTo(startPt.x + size, startPt.y + 100 * 0.9085);
+    mainCtx.lineTo(startPt.x + size / 2, startPt.y + 100 * 1.1851);
+    mainCtx.lineTo(startPt.x, startPt.y + 100 * 0.9085);
+    mainCtx.lineTo(startPt.x, startPt.y);
 
-    ctx.strokeStyle = '#F00';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    mainCtx.strokeStyle = '#F00';
+    mainCtx.lineWidth = 1;
+    mainCtx.stroke();
   }
 
-  renderAudioGoneMirror() {
-    const { ctx, ch, cw, frequencyData, amplificator } = this;
+  renderAudioGoneMirror(ctx) {
+    const { ch, cw, frequencyData, amplificator } = this;
     const size = this.visualizationSize;
     const numberOfSides = this.bufferSize / Math.PI;
     const startPt = {
@@ -455,35 +439,35 @@ export class VisualizerComponent implements OnInit {
   }
 
   renderAudioGoneSimple() {
-    const { ctx, ch, cw, frequencyData } = this;
+    const { mainCtx, ch, cw, frequencyData } = this;
     const size = 120;
     const numberOfSides = this.bufferSize / Math.PI - 5;
 
     this.analyser.getByteFrequencyData(frequencyData);
 
-    ctx.beginPath();
-    ctx.moveTo(
+    mainCtx.beginPath();
+    mainCtx.moveTo(
       cw + (size + frequencyData[0]) * Math.cos(0),
       ch + (size + frequencyData[0]) * Math.sin(0));
     for (let i = 1; i < numberOfSides; i++) {
       const pulse = frequencyData[i];
-      ctx.lineTo(
+      mainCtx.lineTo(
         cw + (size + pulse) * Math.cos(i * 2 * Math.PI / numberOfSides),
         ch + (size + pulse) * Math.sin(i * 2 * Math.PI / numberOfSides)
       );
     }
-    ctx.lineTo(
+    mainCtx.lineTo(
       cw + (size + frequencyData[0]) * Math.cos(0),
       ch + (size + frequencyData[0]) * Math.sin(0)
     );
-    ctx.strokeStyle = '#F00';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    mainCtx.strokeStyle = '#F00';
+    mainCtx.lineWidth = 1;
+    mainCtx.stroke();
 
   }
 
   renderMultiLines() {
-    const { ctx, ch, frequencyData, freqBinCount } = this;
+    const { mainCtx, ch, frequencyData, freqBinCount } = this;
     this.analyser.getByteFrequencyData(frequencyData);
     this.frameCounter++;
     if (this.frameCounter === 0 || this.frameCounter === this.generateLineEvery) {
@@ -501,37 +485,37 @@ export class VisualizerComponent implements OnInit {
   }
 
   renderSingleLine(frequencyData, lineIdx) {
-    const { ctx, ch, h } = this;
+    const { mainCtx, ch, h } = this;
     const color = (lineIdx / this.lineMemoryCount * 340);
     const opacity = 1 - (lineIdx / this.lineMemoryCount);
     const offsetY = h - lineIdx * 20;
-    ctx.strokeStyle = 'hsla(' + color + ', 100%, 50%, ' + opacity + ')';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, offsetY);
+    mainCtx.strokeStyle = 'hsla(' + color + ', 100%, 50%, ' + opacity + ')';
+    mainCtx.lineWidth = 2;
+    mainCtx.beginPath();
+    mainCtx.moveTo(0, offsetY);
     for (let i = 1; i < frequencyData.length; i++) {
-      ctx.lineTo(i * 2, offsetY - frequencyData[i]);
+      mainCtx.lineTo(i * 2, offsetY - frequencyData[i]);
     }
-    ctx.stroke();
+    mainCtx.stroke();
   }
 
   renderCircle() {
-    const { ctx, circle, dToR } = this;
+    const { mainCtx, circle, dToR } = this;
 
-    const gradient4 = ctx.createRadialGradient(0, circle.radius, 0, 0, circle.radius, 25);
+    const gradient4 = mainCtx.createRadialGradient(0, circle.radius, 0, 0, circle.radius, 25);
     gradient4.addColorStop(0, 'hsla(359,100%,50%,0.8)');
     gradient4.addColorStop(1, 'hsla(30, 100%, 50%, 0)');
-    ctx.fillStyle = gradient4;
+    mainCtx.fillStyle = gradient4;
 
-    ctx.save();
-    ctx.translate(circle.x, circle.y);
-    ctx.rotate(dToR(circle.rotation));
-    ctx.beginPath();
-    ctx.arc(0, 0, circle.radius, dToR(circle.angleStart), dToR(circle.angleEnd), true);
-    ctx.lineWidth = circle.thickness;
-    ctx.strokeStyle = gradient4;
-    ctx.stroke();
-    ctx.restore();
+    mainCtx.save();
+    mainCtx.translate(circle.x, circle.y);
+    mainCtx.rotate(dToR(circle.rotation));
+    mainCtx.beginPath();
+    mainCtx.arc(0, 0, circle.radius, dToR(circle.angleStart), dToR(circle.angleEnd), true);
+    mainCtx.lineWidth = circle.thickness;
+    mainCtx.strokeStyle = gradient4;
+    mainCtx.stroke();
+    mainCtx.restore();
     if (circle.rotation < 360) {
       circle.rotation += circle.speed;
     } else {
@@ -541,12 +525,12 @@ export class VisualizerComponent implements OnInit {
 
   renderClassic() {
     this.analyser.getByteFrequencyData(this.frequencyData);
-    this.ctx.fillStyle = this.barColor;
-    this.ctx.clearRect(0, 0, this.w, this.h);
+    this.mainCtx.fillStyle = this.barColor;
+    this.mainCtx.clearRect(0, 0, this.w, this.h);
     let x = 0;
     for (let i = 0; i < this.freqBinCount ; i++) {
       this.barHeight = (150 + this.frequencyData[i]) * this.multiplier;
-      this.ctx.fillRect(x, this.h - this.barHeight, this.barWidth, this.barHeight);
+      this.mainCtx.fillRect(x, this.h - this.barHeight, this.barWidth, this.barHeight);
       x += this.barWidth + this.barSpacing;
     }
   }
@@ -581,26 +565,26 @@ export class VisualizerComponent implements OnInit {
   }
 
   renderXgone() {
-    const { ctx, ch, cw, frequencyData } = this;
+    const { mainCtx, ch, cw, frequencyData } = this;
     const numberOfSides = 128;
     const size = 150;
     const centerX = cw;
     const centerY = ch;
 
-    ctx.beginPath();
-    ctx.moveTo (centerX + size * Math.cos(0), centerY +  size *  Math.sin(0));
+    mainCtx.beginPath();
+    mainCtx.moveTo (centerX + size * Math.cos(0), centerY +  size *  Math.sin(0));
     for (let i = 1; i <= numberOfSides; i++) {
-      ctx.lineTo(
+      mainCtx.lineTo(
         centerX + size * Math.cos(i * 2 * Math.PI / numberOfSides),
         centerY + size * Math.sin(i * 2 * Math.PI / numberOfSides));
     }
-    ctx.strokeStyle = '#F00';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    mainCtx.strokeStyle = '#F00';
+    mainCtx.lineWidth = 1;
+    mainCtx.stroke();
   }
 
   drawGradient(x, y, amplitude, color) {
-    const grad1 = this.ctx.createRadialGradient(
+    const grad1 = this.mainCtx.createRadialGradient(
       x,
       y,
       0,
@@ -610,9 +594,9 @@ export class VisualizerComponent implements OnInit {
     );
     grad1.addColorStop(0, color);
     grad1.addColorStop(1, this.getBackgroundColor());
-    this.ctx.globalCompositeOperation = 'color';
-    this.ctx.fillStyle = grad1;
-    this.ctx.fillRect(0, 0, this.w, this.h);
+    this.mainCtx.globalCompositeOperation = 'color';
+    this.mainCtx.fillStyle = grad1;
+    this.mainCtx.fillRect(0, 0, this.w, this.h);
   }
 }
 
@@ -620,7 +604,7 @@ export class VisualizerComponent implements OnInit {
 //////////////////////////////////
 // Crée un nouvel élément Image
 //   backgroundImage.onload = () => {
-//     ctx.drawImage(backgroundImage, 0, 0);
+//     mainCtx.drawImage(backgroundImage, 0, 0);
 //   };
 //   backgroundImage.src = 'https://wallpaperplay.com/walls/full/f/6/8/131287.jpg'; // Définit le chemin vers sa source
 

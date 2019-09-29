@@ -8,10 +8,10 @@ import { Component, OnInit } from '@angular/core';
 export class ParticulesComponent implements OnInit {
 
   constructor() { }
-    //https://codepen.io/iiSeptum/pen/sEanl
+  // https://codepen.io/iiSeptum/pen/sEanl
   // https://codepen.io/eltonkamami/pen/ECrKd
   // nice lightning https://codepen.io/jlong64/pen/jwJpc
-// https://codepen.io/jackrugile/pen/rByIw
+  // https://codepen.io/jackrugile/pen/rByIw
   ngOnInit() {
   }
 

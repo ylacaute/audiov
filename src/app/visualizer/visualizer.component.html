@@ -122,11 +122,11 @@
         </div>
 
         <div class="parameter-box">
-            <strong>EFFECT</strong>
+            <strong>MAIN LAYER</strong>
             <br/>
             <mat-form-field class="viz-ctrl">
                 <mat-label>GlobalCompositeOperation before clean</mat-label>
-                <mat-select [(ngModel)]="GlobalCompositeOperationBeforeClean">
+                <mat-select [(ngModel)]="mainLayerParameters.globalCompositeOperationBeforeClean">
                     <mat-option
                             *ngFor="let gco of globalCompositeOperations"
                             [value]="gco.value">
@@ -137,7 +137,30 @@
             <br/>
             <mat-form-field class="viz-ctrl">
                 <mat-label>GlobalCompositeOperation after clean</mat-label>
-                <mat-select [(ngModel)]="GlobalCompositeOperationAfterClean">
+                <mat-select [(ngModel)]="mainLayerParameters.globalCompositeOperationAfterClean">
+                    <mat-option
+                            *ngFor="let gco of globalCompositeOperations"
+                            [value]="gco.value">
+                        {{gco.viewValue}}
+                    </mat-option>
+                </mat-select>
+            </mat-form-field>
+            <strong>VIZ LAYER</strong>
+            <br/>
+            <mat-form-field class="viz-ctrl">
+                <mat-label>GlobalCompositeOperation before clean</mat-label>
+                <mat-select [(ngModel)]="vizLayerParameters.globalCompositeOperationBeforeClean">
+                    <mat-option
+                            *ngFor="let gco of globalCompositeOperations"
+                            [value]="gco.value">
+                        {{gco.viewValue}}
+                    </mat-option>
+                </mat-select>
+            </mat-form-field>
+            <br/>
+            <mat-form-field class="viz-ctrl">
+                <mat-label>GlobalCompositeOperation after clean</mat-label>
+                <mat-select [(ngModel)]="vizLayerParameters.globalCompositeOperationAfterClean">
                     <mat-option
                             *ngFor="let gco of globalCompositeOperations"
                             [value]="gco.value">
